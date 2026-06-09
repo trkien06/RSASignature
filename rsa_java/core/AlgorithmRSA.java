@@ -12,16 +12,6 @@ import java.security.SecureRandom;
 
 /**
  * AlgorithmRSA — toàn bộ logic thuật toán RSA + SHA-256.
- *
- * Các method partner cần gọi:
- *   KeyPair kp  = AlgorithmRSA.generateKey(512);
- *   KeyPair kp2 = AlgorithmRSA.generateKey(p, q);
- *   String  hex = AlgorithmRSA.hash(bytes);
- *   BigInteger sig = AlgorithmRSA.sign(bytes, kp.privateKey);
- *
- * Partner tự xác minh bằng:
- *   BigInteger m = sig.modPow(kp.publicKey.e, kp.publicKey.n);
- *   boolean ok   = m.equals(new BigInteger(1, sha256bytes));
  */
 public class AlgorithmRSA {
 
@@ -29,12 +19,12 @@ public class AlgorithmRSA {
 
     /**
      * Sinh P, Q ngẫu nhiên rồi tạo cặp khóa RSA.
-     *
-     * @param bitLength độ dài bit của mỗi số nguyên tố (tối thiểu 256,
-     *                  khuyến nghị 512 cho demo, 2048 cho thực tế)
-     * @return KeyPair chứa PublicKey(N,E) và PrivateKey(N,D)
+     * @param bitLength độ dài bit của mỗi số nguyên tố (tối thiểu 256, khuyến nghị 512 cho demo, 2048 cho thực tế)
      */
     public static KeyPair generateKey(int bitLength) {
+        if (bitLength < 16) {
+            throw new IllegalArgumentException("bitLength quá nhỏ để sinh khóa RSA an toàn.");
+        }
         SecureRandom rng = new SecureRandom();
         BigInteger p, q;
         do {
@@ -47,12 +37,7 @@ public class AlgorithmRSA {
     // ── 2. TẠO KHÓA TỪ P, Q NHẬP TAY ───────────────────────────────────
 
     /**
-     * Tạo cặp khóa RSA từ P, Q do người dùng nhập.
-     *
-     * @param p số nguyên tố thứ nhất
-     * @param q số nguyên tố thứ hai
-     * @return KeyPair chứa PublicKey(N,E) và PrivateKey(N,D)
-     * @throws IllegalArgumentException nếu P hoặc Q không hợp lệ
+     * Tạo cặp khóa RSA từ P, Q do người dùng nhập thủ công.
      */
     public static KeyPair generateKey(BigInteger p, BigInteger q) {
         validatePQ(p, q);
@@ -63,17 +48,9 @@ public class AlgorithmRSA {
 
     /**
      * Tính SHA-256 của mảng byte, trả về chuỗi hex 64 ký tự.
-     *
-     * @param data dữ liệu cần băm (nội dung văn bản hoặc file)
-     * @return chuỗi hex SHA-256
      */
     public static String hash(byte[] data) {
-        try {
-            byte[] h = MessageDigest.getInstance("SHA-256").digest(data);
-            return bytesToHex(h);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("JVM không hỗ trợ SHA-256", e);
-        }
+        return bytesToHex(sha256Bytes(data));
     }
 
     /** Overload tiện lợi cho chuỗi UTF-8 */
@@ -86,80 +63,87 @@ public class AlgorithmRSA {
     /**
      * Ký dữ liệu bằng khóa riêng tư.
      * Quy trình: data → SHA-256 → sig = hash^D mod N
-     *
-     * @param data dữ liệu cần ký (bytes của file hoặc văn bản)
-     * @param key  khóa riêng tư PrivateKey(N, D)
-     * @return chữ ký số BigInteger
-     * @throws IllegalArgumentException nếu N quá nhỏ
      */
     public static BigInteger sign(byte[] data, PrivateKey key) {
         byte[] hashBytes = sha256Bytes(data);
-        BigInteger hashInt = new BigInteger(1, hashBytes); // unsigned
+        BigInteger hashInt = new BigInteger(1, hashBytes); // Đảm bảo số dương (unsigned)
 
-        if (hashInt.compareTo(key.n) >= 0)
+        if (hashInt.compareTo(key.getN()) >= 0) {
             throw new IllegalArgumentException(
-                    "N quá nhỏ so với SHA-256 (256-bit). Dùng P, Q >= 256-bit mỗi số.");
+                    "Modulus N quá nhỏ so với SHA-256 (256-bit). Hãy nhập cặp P, Q lớn hơn.");
+        }
 
-        return hashInt.modPow(key.d, key.n);
+        return hashInt.modPow(key.getD(), key.getN());
     }
 
-    /** Overload cho chuỗi UTF-8 */
+    /** Overload ký cho chuỗi UTF-8 */
     public static BigInteger sign(String text, PrivateKey key) {
         return sign(text.getBytes(StandardCharsets.UTF_8), key);
     }
 
-    // ── INTERNAL: xây KeyPair từ P, Q ───────────────────────────────────
+    // ── 5. XÁC MINH CHỮ KÝ ─────────────────────────────────────────────
+
+    /**
+     * Xác minh tính hợp lệ của chữ ký số.
+     * Quy trình: m' = sig^E mod N. So sánh m' với SHA-256 của dữ liệu gốc.
+     */
+    public static boolean verify(byte[] data, BigInteger signature, PublicKey key) {
+        if (signature == null || key == null) return false;
+        
+        if (signature.compareTo(key.getN()) >= 0 || signature.compareTo(BigInteger.ZERO) < 0) {
+            return false; 
+        }
+
+        BigInteger decryptedHash = signature.modPow(key.getE(), key.getN());
+        BigInteger originalHash = new BigInteger(1, sha256Bytes(data));
+
+        return decryptedHash.equals(originalHash);
+    }
+
+    /** Overload verify cho chuỗi UTF-8 */
+    public static boolean verify(String text, BigInteger signature, PublicKey key) {
+        return verify(text.getBytes(StandardCharsets.UTF_8), signature, key);
+    }
+
+    // ── INTERNAL UTILS ──────────────────────────────────────────────────
 
     private static KeyPair buildKeyPair(BigInteger p, BigInteger q) {
         BigInteger n   = p.multiply(q);
-        BigInteger phi = p.subtract(BigInteger.ONE)
-                .multiply(q.subtract(BigInteger.ONE));
+        BigInteger phi = p.subtract(BigInteger.ONE).multiply(q.subtract(BigInteger.ONE));
         BigInteger e   = chooseE(phi);
         BigInteger d   = e.modInverse(phi);
 
-        return new KeyPair(
-                new PublicKey(n, e),
-                new PrivateKey(n, d)
-        );
+        return new KeyPair(new PublicKey(n, e), new PrivateKey(n, d));
     }
 
-    /**
-     * Chọn E thỏa: 1 < E < phi và gcd(E, phi) = 1.
-     * Ưu tiên 65537 (số Fermat F4 — chuẩn công nghiệp).
-     */
     private static BigInteger chooseE(BigInteger phi) {
         BigInteger e = BigInteger.valueOf(65537);
-        if (phi.gcd(e).equals(BigInteger.ONE)) return e;
-        // fallback: duyệt số lẻ từ 3
+        if (e.compareTo(phi) < 0 && phi.gcd(e).equals(BigInteger.ONE)) {
+            return e;
+        }
+        
         e = BigInteger.valueOf(3);
-        while (!phi.gcd(e).equals(BigInteger.ONE))
+        while (e.compareTo(phi) < 0) {
+            if (phi.gcd(e).equals(BigInteger.ONE)) return e;
             e = e.add(BigInteger.TWO);
-        return e;
+        }
+        throw new IllegalArgumentException("Không tìm thấy E hợp lệ cho cặp P, Q này. Hãy chọn P, Q lớn hơn.");
     }
 
-    /** Kiểm tra đầu vào P, Q */
     private static void validatePQ(BigInteger p, BigInteger q) {
-        if (p == null || q == null)
-            throw new IllegalArgumentException("P và Q không được null.");
-        if (!p.isProbablePrime(50))
-            throw new IllegalArgumentException("P không phải số nguyên tố.");
-        if (!q.isProbablePrime(50))
-            throw new IllegalArgumentException("Q không phải số nguyên tố.");
-        if (p.equals(q))
-            throw new IllegalArgumentException("P và Q phải khác nhau.");
+        if (p == null || q == null) throw new IllegalArgumentException("P và Q không được null.");
+        if (!p.isProbablePrime(50)) throw new IllegalArgumentException("P không phải số nguyên tố.");
+        if (!q.isProbablePrime(50)) throw new IllegalArgumentException("Q không phải số nguyên tố.");
+        if (p.equals(q)) throw new IllegalArgumentException("P và Q phải khác nhau.");
     }
-
-    // ── INTERNAL: SHA-256 trả về byte[] ─────────────────────────────────
 
     private static byte[] sha256Bytes(byte[] data) {
         try {
             return MessageDigest.getInstance("SHA-256").digest(data);
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("JVM không hỗ trợ SHA-256", e);
+            throw new RuntimeException("Hệ thống không hỗ trợ thư viện SHA-256", e);
         }
     }
-
-    // ── INTERNAL: byte[] → hex string ───────────────────────────────────
 
     private static String bytesToHex(byte[] bytes) {
         StringBuilder sb = new StringBuilder(bytes.length * 2);
