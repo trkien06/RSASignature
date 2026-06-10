@@ -1,31 +1,30 @@
-# 🔐 Phần mềm Quản lý Chữ ký số RSA (C++ Win32 API)
+# 🔐 Phần mềm Mô phỏng Chữ ký số RSA (Phiên bản C++)
 
-Đây là một ứng dụng Desktop hoàn chỉnh được viết bằng **C++ (Windows API)** giúp mô phỏng quá trình tạo khóa, ký số và xác minh tài liệu bằng thuật toán **RSA số nguyên lớn** (BigInteger) kết hợp băm dữ liệu **SHA-256**.
+Đây là dự án phần mềm mô phỏng quy trình hoạt động của hệ thống **Chữ ký số (Digital Signature)**, sử dụng thuật toán mã hóa bất đối xứng **RSA** kết hợp với thuật toán băm **SHA-256**. 
 
-Project này được thiết kế với giao diện đồ họa thân thiện, đồng bộ hóa hệ cơ số HEX và xử lý an toàn với mọi loại file (kể cả thư mục chứa tiếng Việt).
+Dự án được xây dựng nhằm mục đích học tập, nghiên cứu và báo cáo đồ án môn học An toàn và Bảo mật thông tin.
 
-## ✨ Các tính năng chính
+## ✨ Tính năng chính
 
-* **Tạo cặp khóa RSA (BigInt):** Tự động sinh hoặc tính toán khóa Công khai (Public Key) và Bí mật (Private Key) từ 2 số nguyên tố P, Q.
-* **Thuật toán băm SHA-256 tự xây dựng:** Xử lý băm file độc lập 100% bằng C++, không phụ thuộc vào CryptoAPI của Windows, hỗ trợ mọi định dạng tệp (.txt, .docx, .pdf, .png...).
-* **Ký số tài liệu:** Mã hóa mã băm bằng Private Key để tạo chữ ký số hệ cơ số Thập lục phân (HEX).
-* **Xác minh chữ ký:** Giải mã chữ ký bằng Public Key và đối chiếu để kiểm tra tính toàn vẹn của dữ liệu.
-* **Giao diện Tiếng Việt (Unicode):** Đọc/ghi mượt mà các file/thư mục có dấu.
-* **Quản lý tệp chuyên nghiệp:** Xuất đồng loạt các tệp `.signed`, `_signature.txt`, và `_public_key.txt` để gửi cho đối tác.
+Phần mềm cung cấp giao diện trực quan với 2 luồng chức năng chính:
 
----
+**1. Quản lý Khóa (Key Generation)**
+* Sinh cặp khóa RSA ngẫu nhiên với các số nguyên siêu lớn (BigInt).
+* Hỗ trợ tính toán và tạo khóa thủ công từ hai số nguyên tố $p, q$ do người dùng nhập.
+* Hiển thị trực quan Modulus $n$, hàm Euler $\Phi(n)$, số mũ công khai $e$, số mũ bí mật $d$.
 
-## 🛠 Yêu cầu hệ thống (Prerequisites)
+**2. Ký số & Xác minh (Sign & Verify)**
+* **Phía Người Gửi:** Nạp tệp tin bất kỳ (TXT, PDF, DOCX, Hình ảnh...), băm dữ liệu bằng hàm SHA-256 và dùng Khóa riêng tư để tạo ra Chữ ký số. Dữ liệu băm và chữ ký được đồng bộ hiển thị dưới dạng hệ cơ số Thập lục phân (HEX) để đảm bảo độ chính xác và đồng bộ 100% mã chữ ký với các nền tảng khác (như Java). Hỗ trợ đóng gói xuất 3 file cùng lúc (`.signed`, `_signature.txt`, `_public_key.txt`) để gửi cho đối tác.
+* **Phía Người Nhận:** Nạp tệp tin nhận được, giải mã chữ ký HEX bằng Khóa công khai và đối chiếu hàm băm để xác minh Tính toàn vẹn (file có bị sửa đổi không) và Tính xác thực (người gửi là ai).
 
-Để biên dịch và chạy dự án này, máy tính của bạn cần có:
+## 🛠 Công nghệ sử dụng
 
-1. **Hệ điều hành:** Windows (10, 11).
-2. **Trình biên dịch / IDE:** Code::Blocks (MinGW).
-3. **Thư viện Boost (Bắt buộc):** Project sử dụng `boost::multiprecision::cpp_int` để xử lý các phép toán số lớn vượt quá giới hạn 64-bit cơ bản của C++. (Sử dụng bản `boost_1_66_0`).
-
----
-
-## 🚀 Hướng dẫn Cài đặt & Cấu hình Code::Blocks
+* **Ngôn ngữ lập trình:** C++ (Chuẩn C++11 trở lên).
+* **Giao diện người dùng:** Windows API (Win32 API) thiết kế giao diện native, tích hợp tệp tài nguyên (Resource file) để nhúng cứng Logo `.ico` vào ứng dụng.
+* **Xử lý số lớn:** Sử dụng thư viện `boost::multiprecision::cpp_int` (phiên bản `boost_1_66_0`) để xử lý các phép toán mã hóa RSA phức tạp vượt giới hạn bộ nhớ 64-bit mặc định của C++.
+* **Thuật toán băm:** Tự xây dựng lõi SHA-256 hoàn toàn bằng C++, độc lập với CryptoAPI của hệ điều hành. Hỗ trợ I/O đọc file an toàn tuyệt đối với các đường dẫn thư mục chứa Tiếng Việt có dấu.
+* **Môi trường phát triển (IDE):** Code::Blocks (Sử dụng trình biên dịch MinGW).
+* ## 🚀 Hướng dẫn Cài đặt & Cấu hình Code::Blocks
 
 ### Bước 1: Tải và cài đặt thư viện Boost
 1. Tải về tệp thư viện `boost_1_66_0.7z`.
@@ -50,3 +49,22 @@ Chuyển sang tab **Linker settings** và điền chính xác các thông số s
 * **Tại ô "Other linker options" (Khung bên phải):** Copy và dán toàn bộ dòng cờ lệnh sau:
   ```text
   -lole32 -lshell32 -lcomdlg32 -mwindows -static-libgcc -static-libstdc++
+
+## 📂 Cấu trúc Dự án
+
+Dự án được thiết kế theo mô hình phân lớp rõ ràng để dễ dàng quản lý:
+
+```text
+RSASignature/
+├── core/             # Chứa thuật toán mã hóa RSA (tích hợp Boost) và lõi băm SHA-256 tự code.
+│   ├── AlgorithmRSA.cpp
+│   ├── AlgorithmRSA.h
+│   └── InfInt.h      # Wrapper ánh xạ định nghĩa số lớn cpp_int của Boost
+├── model/            # Chứa các cấu trúc đối tượng dữ liệu
+│   ├── KeyPair.h
+│   ├── PrivateKey.h
+│   └── PublicKey.h
+├── MainForm.cpp      # Tệp nguồn chính khởi tạo giao diện đồ họa (GUI) và xử lý luồng sự kiện.
+├── logo.ico          # Tài nguyên hình ảnh (Logo ứng dụng).
+├── resource.rc       # Tệp cấu hình tài nguyên để nhúng logo vào tệp thực thi .exe.
+└── RSASignature.cbp  # Tệp quản lý cấu hình dự án (Project file) của Code::Blocks.
